@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Birthdays</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:           #FAF8F4;
+      --surface:      #FFFFFF;
+      --text:         #1C1814;
+      --muted:        #8B7355;
+      --accent:       #C4622D;
+      --accent-light: #F5E6DC;
+      --border:       #EDE8DF;
+      --shadow:       0 2px 16px rgba(44, 32, 20, 0.08);
+      --radius:       16px;
+      --font-display: 'Cormorant Garamond', serif;
+      --font-body:    'Outfit', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      max-width: 430px;
+      margin: 0 auto;
+      overflow-x: hidden;
+    }
+
+    #app { min-height: 100vh; padding-bottom: 84px; }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 56px 24px 20px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+    .header-eyebrow { font-size: 12px; color: var(--muted); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px; }
+    .header-title   { font-family: var(--font-display); font-size: 44px; font-weight: 400; font-style: italic; line-height: 1; }
+    .header-count   { font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+
+    /* ── BIRTHDAY LIST ── */
+    .birthday-list { padding: 4px 16px 0; display: flex; flex-direction: column; gap: 10px; }
+
+    .birthday-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: transform 0.13s ease, box-shadow 0.13s ease;
+    }
+    .birthday-card:active { transform: scale(0.975); }
+    .birthday-card.soon  { border-color: rgba(196,98,45,0.3); background: linear-gradient(135deg,#FFFCFA 0%,#FFF6EF 100%); }
+    .birthday-card.today { border-color: var(--accent); background: linear-gradient(135deg, var(--accent-light) 0%, #FDEEE4 100%); }
+
+    .card-name     { font-family: var(--font-display); font-size: 25px; font-weight: 500; line-height: 1.1; margin-bottom: 3px; }
+    .card-date     { font-size: 13px; color: var(--muted); }
+    .card-tz       { font-size: 11px; color: var(--muted); opacity: 0.65; margin-top: 2px; }
+
+    .card-right    { text-align: right; flex-shrink: 0; margin-left: 16px; }
+    .days-num      { font-size: 30px; font-weight: 600; line-height: 1; color: var(--text); }
+    .days-lbl      { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.2px; }
+    .today-pill    { background: var(--accent); color: white; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 20px; }
+
+    /* ── EMPTY STATE ── */
+    .empty-state { text-align: center; padding: 80px 32px; }
+    .empty-icon  { font-size: 52px; display: block; margin-bottom: 16px; }
+    .empty-title { font-family: var(--font-display); font-size: 30px; font-style: italic; margin-bottom: 8px; }
+    .empty-sub   { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: rgba(250,248,244,0.93);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      display: flex; padding: 8px 0 28px; z-index: 100;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 8px 0; cursor: pointer; background: none; border: none; transition: opacity 0.15s;
+    }
+    .nav-btn:active { opacity: 0.5; }
+    .nav-icon  { font-size: 22px; transition: transform 0.2s; line-height: 1; }
+    .nav-btn.active .nav-icon { transform: scale(1.2); }
+    .nav-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .nav-btn.active .nav-label { color: var(--accent); }
+
+    /* ── SCREENS (shared) ── */
+    .screen        { padding: 56px 24px 24px; }
+    .screen-title  { font-family: var(--font-display); font-size: 36px; font-style: italic; margin-bottom: 4px; }
+    .screen-sub    { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+
+    /* ── NLP BOX ── */
+    .nlp-box    { background: var(--surface); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 24px; }
+    .nlp-label  { font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .nlp-input  {
+      width: 100%; border: none; background: transparent; font-family: var(--font-body);
+      font-size: 15px; color: var(--text); resize: none; outline: none; line-height: 1.65; min-height: 72px;
+    }
+    .nlp-input::placeholder { color: var(--muted); opacity: 0.55; }
+    .nlp-btn {
+      margin-top: 12px; width: 100%; background: var(--accent); color: white;
+      border: none; border-radius: 12px; padding: 13px; font-family: var(--font-body);
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .nlp-btn:active   { opacity: 0.8; }
+    .nlp-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .parsed-ok  { background: var(--accent-light); border: 1px solid rgba(196,98,45,0.25); border-radius: 12px; padding: 13px 16px; margin-top: 12px; font-size: 13px; line-height: 1.6; }
+    .parsed-ok strong { color: var(--accent); }
+    .parsed-err { background: #FFF0F0; border: 1px solid rgba(192,57,43,0.2); border-radius: 12px; padding: 13px 16px; margin-top: 12px; font-size: 13px; color: #C0392B; line-height: 1.6; }
+
+    /* ── DIVIDER ── */
+    .divider      { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .divider-line { flex: 1; height: 1px; background: var(--border); }
+    .divider-text { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+    /* ── FORM ── */
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .form-input, .form-select {
+      width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; padding: 14px 16px; font-family: var(--font-body);
+      font-size: 15px; color: var(--text); outline: none; transition: border-color 0.15s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--accent); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sel-wrap { position: relative; }
+    .sel-wrap::after { content: '↓'; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); pointer-events: none; }
+
+    .submit-btn {
+      width: 100%; background: var(--text); color: var(--bg); border: none;
+      border-radius: 12px; padding: 16px; font-family: var(--font-body);
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; margin-top: 8px;
+    }
+    .submit-btn:active { opacity: 0.75; }
+
+    /* ── DETAIL ── */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 14px;
+      color: var(--accent); font-weight: 500; cursor: pointer; background: none; border: none;
+      padding: 0; margin-bottom: 28px;
+    }
+    .detail-name   { font-family: var(--font-display); font-size: 48px; font-style: italic; font-weight: 400; line-height: 1; margin-bottom: 6px; }
+    .detail-date   { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+    .countdown-box { background: var(--accent-light); border-radius: var(--radius); padding: 28px; text-align: center; margin-bottom: 16px; }
+    .countdown-num { font-size: 68px; font-weight: 600; line-height: 1; color: var(--accent); }
+    .countdown-lbl { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+    .info-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden; }
+    .info-row  { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+    .info-row:last-child { border-bottom: none; }
+    .info-key  { font-size: 13px; color: var(--muted); }
+    .info-val  { font-size: 14px; font-weight: 500; text-align: right; max-width: 55%; }
+
+    .notify-box { background: var(--surface); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); display: flex; align-items: flex-start; gap: 12px; margin-bottom: 24px; }
+    .notify-icon { font-size: 18px; padding-top: 1px; }
+    .notify-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .notify-text strong { color: var(--text); font-weight: 600; }
+
+    .actions { display: flex; gap: 12px; }
+    .action-btn { flex: 1; padding: 14px; border-radius: 12px; font-family: var(--font-body); font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+    .action-btn:active { opacity: 0.75; }
+    .action-btn.edit   { background: var(--text); color: var(--bg); }
+    .action-btn.delete { background: #FFE8E8; color: #C0392B; }
+
+    /* ── SETTINGS ── */
+    .settings-note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+    .settings-note a { color: var(--accent); text-decoration: none; }
+    .section-header { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin: 28px 0 14px; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(10px);
+      background: var(--text); color: var(--bg); padding: 11px 20px; border-radius: 24px;
+      font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none; white-space: nowrap; z-index: 300; max-width: 90%;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── PULSE LOADER ── */
+    .pulse-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 10px 0; }
+    .dots { display: flex; gap: 4px; }
+    .dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s ease-in-out infinite; }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,100%{opacity:0.25;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+
+    /* ── ANIMATIONS ── */
+    .fade-in { animation: fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── SECTION LABEL ── */
+    .list-section-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; padding: 0 16px; margin: 20px 0 10px; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+
+<script>
+// ──────────────────────────────────────────
+//  CONSTANTS
+// ──────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+
+const TIMEZONES = [
+  { label: 'India (IST, UTC+5:30)',       value: 'Asia/Kolkata' },
+  { label: 'New York (ET)',               value: 'America/New_York' },
+  { label: 'Chicago (CT)',                value: 'America/Chicago' },
+  { label: 'Denver (MT)',                 value: 'America/Denver' },
+  { label: 'Los Angeles (PT)',            value: 'America/Los_Angeles' },
+  { label: 'Honolulu (HST)',              value: 'Pacific/Honolulu' },
+  { label: 'London (GMT/BST)',            value: 'Europe/London' },
+  { label: 'Paris / Berlin (CET)',        value: 'Europe/Paris' },
+  { label: 'Moscow (MSK)',               value: 'Europe/Moscow' },
+  { label: 'Dubai (GST, UTC+4)',          value: 'Asia/Dubai' },
+  { label: 'Pakistan (PKT, UTC+5)',       value: 'Asia/Karachi' },
+  { label: 'Nepal (NPT, UTC+5:45)',       value: 'Asia/Kathmandu' },
+  { label: 'Bangladesh (BST, UTC+6)',     value: 'Asia/Dhaka' },
+  { label: 'Sri Lanka (SLST)',            value: 'Asia/Colombo' },
+  { label: 'Singapore / KL (SGT)',        value: 'Asia/Singapore' },
+  { label: 'Tokyo (JST, UTC+9)',          value: 'Asia/Tokyo' },
+  { label: 'Shanghai / Beijing (CST)',    value: 'Asia/Shanghai' },
+  { label: 'Sydney (AEST)',              value: 'Australia/Sydney' },
+  { label: 'Auckland (NZST)',            value: 'Pacific/Auckland' },
+];
+
+const LEAD_TIMES = [
+  { label: 'On their birthday',  value: 'on_day',  days: 0 },
+  { label: '1 day before',       value: '1_day',   days: 1 },
+  { label: '2 days before',      value: '2_days',  days: 2 },
+  { label: '1 week before',      value: '1_week',  days: 7 },
+];
+
+// ──────────────────────────────────────────
+//  STATE
+// ──────────────────────────────────────────
+const state = {
+  view:         'home',
+  birthdays:    [],
+  selectedId:   null,
+  editingId:    null,
+  apiKey:       '',
+  userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+};
+
+// ──────────────────────────────────────────
+//  STORAGE
+// ──────────────────────────────────────────
+function loadData() {
+  try {
+    const raw = localStorage.getItem('bday_v1');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    state.birthdays    = d.birthdays    || [];
+    state.apiKey       = d.apiKey       || '';
+    state.userTimezone = d.userTimezone || state.userTimezone;
+  } catch(e) { console.error(e); }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem('bday_v1', JSON.stringify({
+      birthdays:    state.birthdays,
+      apiKey:       state.apiKey,
+      userTimezone: state.userTimezone,
+    }));
+  } catch(e) { console.error(e); }
+}
+
+// ──────────────────────────────────────────
+//  UTILS
+// ──────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function daysUntil(month, day, tz) {
+  const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, year:'numeric', month:'numeric', day:'numeric' });
+  const p   = fmt.formatToParts(new Date());
+  const get = t => parseInt(p.find(x => x.type === t).value);
+  const [tY, tM, tD] = [get('year'), get('month'), get('day')];
+  let bY = tY;
+  if (tM > month || (tM === month && tD > day)) bY++;
+  const todayMs = Date.UTC(tY, tM - 1, tD);
+  const bDayMs  = Date.UTC(bY, month - 1, day);
+  return Math.round((bDayMs - todayMs) / 86400000);
+}
+
+function fmtDate(m, d)   { return `${MONTHS[m-1]} ${d}`; }
+function leadLabel(v)    { return LEAD_TIMES.find(l => l.value === v)?.label || 'On their birthday'; }
+function tzLabel(v)      { return TIMEZONES.find(t => t.value === v)?.label || v; }
+
+function notifyDescription(b) {
+  const lead = LEAD_TIMES.find(l => l.value === b.leadTime);
+  const offset = lead?.days || 0;
+  const when = offset === 0
+    ? `on ${fmtDate(b.month, b.day)} (their birthday in ${tzLabel(b.timezone)})`
+    : `${offset} day${offset > 1 ? 's' : ''} before (${fmtDate(b.month, b.day)} their time)`;
+  return `You'll get a notification at <strong>${b.notifTime || '08:00'} your time</strong>, ${when}.`;
+}
+
+function sortBirthdays(list) {
+  return [...list].sort((a, b) => daysUntil(a.month, a.day, a.timezone) - daysUntil(b.month, b.day, b.timezone));
+}
+
+// ──────────────────────────────────────────
+//  TOAST
+// ──────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ──────────────────────────────────────────
+//  NAVIGATION
+// ──────────────────────────────────────────
+function go(view, extra = {}) {
+  state.view = view;
+  Object.assign(state, extra);
+  render();
+  window.scrollTo(0, 0);
+}
+
+// ──────────────────────────────────────────
+//  CLAUDE API — NLP PARSING
+// ──────────────────────────────────────────
+async function parseNLP(text) {
+  if (!state.apiKey) { toast('Add your API key in Settings first'); return null; }
+
+  const sys = `You are a birthday reminder parser. Extract info from natural language.
+Return ONLY valid JSON — no markdown fences, no explanation.
+
+Output format:
+{
+  "name": "string",
+  "month": <1-12 or null>,
+  "day": <1-31 or null>,
+  "timezone": "<IANA timezone or null>",
+  "leadTime": "<on_day|1_day|2_days|1_week>"
+}
+
+Timezone mappings:
+"india / IST / Indian timings" → Asia/Kolkata
+"New York / ET / EST / Eastern" → America/New_York
+"LA / PT / PST / California / West Coast" → America/Los_Angeles
+"UK / London / GMT / BST" → Europe/London
+"Dubai / UAE / GST" → Asia/Dubai
+"Pakistan / PKT" → Asia/Karachi
+"Australia / Sydney / AEST" → Australia/Sydney
+"Japan / Tokyo / JST" → Asia/Tokyo
+"Germany / Paris / CET / Europe" → Europe/Paris
+"Singapore / KL / SGT" → Asia/Singapore
+"Bangladesh / BST+" → Asia/Dhaka
+"Nepal / NPT" → Asia/Kathmandu
+
+Lead time rules:
+"on the day / same day / when it is" → on_day (default)
+"1 day before / a day before / day before" → 1_day
+"2 days before" → 2_days
+"a week before / 1 week before / week before" → 1_week
+
+If any field is unclear, use null.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type':      'application/json',
+      'x-api-key':         state.apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model:      'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system:     sys,
+      messages:   [{ role: 'user', content: text }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const raw  = data.content[0]?.text || '{}';
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+// ──────────────────────────────────────────
+//  DATA MUTATIONS
+// ──────────────────────────────────────────
+function upsertBirthday(data, id = null) {
+  if (id) {
+    state.birthdays = state.birthdays.map(b => b.id === id ? { ...b, ...data } : b);
+  } else {
+    state.birthdays.push({ id: uid(), createdAt: Date.now(), ...data });
+  }
+  saveData();
+}
+
+function removeBirthday(id) {
+  state.birthdays = state.birthdays.filter(b => b.id !== id);
+  saveData();
+}
+
+// ──────────────────────────────────────────
+//  RENDER — NAV
+// ──────────────────────────────────────────
+function renderNav() {
+  const tabs = [
+    { id: 'home',     icon: '🎂', label: 'Birthdays' },
+    { id: 'add',      icon: '＋', label: 'Add'       },
+    { id: 'settings', icon: '◎',  label: 'Settings'  },
+  ];
+  return `<nav class="bottom-nav">
+    ${tabs.map(t => `
+      <button class="nav-btn ${state.view === t.id || (state.view === 'detail' && t.id === 'home') ? 'active' : ''}"
+              onclick="go('${t.id}', {editingId: null})">
+        <span class="nav-icon">${t.icon}</span>
+        <span class="nav-label">${t.label}</span>
+      </button>`).join('')}
+  </nav>`;
+}
+
+// ──────────────────────────────────────────
+//  RENDER — HOME
+// ──────────────────────────────────────────
+function renderHome() {
+  const sorted = sortBirthdays(state.birthdays);
+  const soon   = sorted.filter(b => { const d = daysUntil(b.month, b.day, b.timezone); return d <= 14 && d > 0; });
+  const rest   = sorted.filter(b => daysUntil(b.month, b.day, b.timezone) > 14 || daysUntil(b.month, b.day, b.timezone) === 0);
+
+  function card(b) {
+    const days    = daysUntil(b.month, b.day, b.timezone);
+    const isToday = days === 0;
+    const isSoon  = days <= 14 && days > 0;
+    return `<div class="birthday-card ${isToday ? 'today' : isSoon ? 'soon' : ''} fade-in"
+                 onclick="go('detail', {selectedId:'${b.id}'})">
+      <div>
+        <div class="card-name">${b.name}</div>
+        <div class="card-date">${fmtDate(b.month, b.day)}</div>
+        <div class="card-tz">${tzLabel(b.timezone)}</div>
+      </div>
+      <div class="card-right">
+        ${isToday
+          ? '<span class="today-pill">🎉 Today!</span>'
+          : `<div class="days-num">${days}</div><div class="days-lbl">days away</div>`}
+      </div>
+    </div>`;
+  }
+
+  const listHtml = sorted.length === 0
+    ? `<div class="empty-state fade-in">
+        <span class="empty-icon">🎂</span>
+        <div class="empty-title">No birthdays yet</div>
+        <div class="empty-sub">Tap + to add your first birthday<br>and never forget again.</div>
+      </div>`
+    : `<div class="birthday-list">
+        ${soon.length ? `<div class="list-section-label">Coming up soon</div>${soon.map(card).join('')}` : ''}
+        ${rest.length ? `${soon.length ? '<div class="list-section-label" style="margin-top:24px">All birthdays</div>' : ''}${rest.map(card).join('')}` : ''}
+      </div>`;
+
+  return `
+    <div class="header fade-in">
+      <div>
+        <div class="header-eyebrow">upcoming</div>
+        <div class="header-title">Birthdays</div>
+      </div>
+      <div class="header-count">${state.birthdays.length} saved</div>
+    </div>
+    ${listHtml}`;
+}
+
+// ──────────────────────────────────────────
+//  RENDER — ADD / EDIT
+// ──────────────────────────────────────────
+function renderAdd() {
+  const editing = state.editingId ? state.birthdays.find(b => b.id === state.editingId) : null;
+  const p = editing || {};
+
+  const tzOpts   = TIMEZONES.map(t   => `<option value="${t.value}"   ${t.value   === (p.timezone || '')    ? 'selected' : ''}>${t.label}</option>`).join('');
+  const leadOpts = LEAD_TIMES.map(l  => `<option value="${l.value}"   ${l.value   === (p.leadTime || 'on_day') ? 'selected' : ''}>${l.label}</option>`).join('');
+  const monOpts  = MONTHS.map((m,i)  => `<option value="${i+1}"       ${(i+1)     === p.month               ? 'selected' : ''}>${m}</option>`).join('');
+  const dayOpts  = Array.from({length:31},(_,i) =>
+                   `<option value="${i+1}" ${(i+1) === p.day ? 'selected' : ''}>${i+1}</option>`).join('');
+
+  return `<div class="screen fade-in">
+    <div class="screen-title">${editing ? 'Edit Birthday' : 'Add Birthday'}</div>
+    <div class="screen-sub">Type naturally — or fill the form below</div>
+
+    <!-- ✦ NLP -->
+    <div class="nlp-box">
+      <div class="nlp-label">✦ Say it naturally</div>
+      <textarea class="nlp-input" id="nlp" rows="3"
+        placeholder='e.g. "Remind me on Dec 2nd to wish Pooja according to India timings, 1 day before"'></textarea>
+      <button class="nlp-btn" id="nlp-btn" onclick="handleParse()">Parse with AI →</button>
+      <div id="nlp-result"></div>
+    </div>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-text">or fill manually</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- ✦ FORM -->
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="f-name" type="text" placeholder="Pooja" value="${p.name || ''}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Birthday</label>
+      <div class="form-row">
+        <div class="sel-wrap"><select class="form-select" id="f-month">${monOpts}</select></div>
+        <div class="sel-wrap"><select class="form-select" id="f-day">${dayOpts}</select></div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Their Timezone</label>
+      <div class="sel-wrap"><select class="form-select" id="f-tz">${tzOpts}</select></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Remind Me</label>
+      <div class="sel-wrap"><select class="form-select" id="f-lead">${leadOpts}</select></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notification Time (your time)</label>
+      <input class="form-input" id="f-time" type="time" value="${p.notifTime || '08:00'}">
+    </div>
+
+    <button class="submit-btn" onclick="handleSave()">
+      ${editing ? 'Update Birthday' : 'Save Birthday'}
+    </button>
+  </div>`;
+}
+
+// ──────────────────────────────────────────
+//  RENDER — DETAIL
+// ──────────────────────────────────────────
+function renderDetail() {
+  const b = state.birthdays.find(x => x.id === state.selectedId);
+  if (!b) { go('home'); return ''; }
+
+  const days    = daysUntil(b.month, b.day, b.timezone);
+  const isToday = days === 0;
+
+  return `<div class="screen fade-in">
+    <button class="back-btn" onclick="go('home')">← Back</button>
+
+    <div class="detail-name">${b.name}</div>
+    <div class="detail-date">${fmtDate(b.month, b.day)} · ${tzLabel(b.timezone)}</div>
+
+    <div class="countdown-box">
+      ${isToday
+        ? `<div style="font-size:52px;margin-bottom:8px">🎉</div>
+           <div style="font-size:18px;font-weight:600;color:var(--accent)">Happy Birthday, ${b.name}!</div>`
+        : `<div class="countdown-num">${days}</div>
+           <div class="countdown-lbl">days until their birthday</div>`}
+    </div>
+
+    <div class="info-card">
+      <div class="info-row">
+        <span class="info-key">Remind me</span>
+        <span class="info-val">${leadLabel(b.leadTime)}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">At</span>
+        <span class="info-val">${b.notifTime || '08:00'} your time</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Their timezone</span>
+        <span class="info-val">${tzLabel(b.timezone)}</span>
+      </div>
+    </div>
+
+    <div class="notify-box">
+      <span class="notify-icon">🔔</span>
+      <div class="notify-text">${notifyDescription(b)}</div>
+    </div>
+
+    <div class="actions">
+      <button class="action-btn edit"   onclick="go('add', {editingId:'${b.id}'})">Edit</button>
+      <button class="action-btn delete" onclick="handleDelete('${b.id}')">Delete</button>
+    </div>
+  </div>`;
+}
+
+// ──────────────────────────────────────────
+//  RENDER — SETTINGS
+// ──────────────────────────────────────────
+function renderSettings() {
+  const tzOpts = TIMEZONES.map(t =>
+    `<option value="${t.value}" ${t.value === state.userTimezone ? 'selected' : ''}>${t.label}</option>`).join('');
+
+  return `<div class="screen fade-in">
+    <div class="screen-title">Settings</div>
+    <div class="screen-sub">Your preferences</div>
+
+    <div class="form-group">
+      <label class="form-label">Your Timezone</label>
+      <div class="sel-wrap"><select class="form-select" id="s-tz">${tzOpts}</select></div>
+    </div>
+
+    <div class="section-header">AI — Natural Language</div>
+
+    <div class="form-group">
+      <label class="form-label">Anthropic API Key</label>
+      <input class="form-input" id="s-key" type="password"
+        placeholder="sk-ant-api03-..."
+        value="${state.apiKey}"
+        style="font-family:monospace;font-size:13px;letter-spacing:0.5px">
+      <div class="settings-note">
+        Needed only for the "Say it naturally" feature.<br>
+        Get your key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> — it's free to start.
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="handleSaveSettings()">Save Settings</button>
+
+    <div style="text-align:center;margin-top:48px">
+      <div style="font-size:13px;color:var(--muted);font-family:var(--font-display);font-style:italic">Birthdays</div>
+      <div style="font-size:11px;color:var(--border);margin-top:4px">v1.0 · Personal</div>
+    </div>
+  </div>`;
+}
+
+// ──────────────────────────────────────────
+//  MAIN RENDER
+// ──────────────────────────────────────────
+function render() {
+  let html = '';
+  if      (state.view === 'home')     html = renderHome();
+  else if (state.view === 'add')      html = renderAdd();
+  else if (state.view === 'detail')   html = renderDetail();
+  else if (state.view === 'settings') html = renderSettings();
+
+  document.getElementById('app').innerHTML = html + renderNav();
+  attachListeners();
+}
+
+function attachListeners() {
+  const nlp = document.getElementById('nlp');
+  if (nlp) {
+    nlp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleParse(); }
+    });
+  }
+}
+
+// ──────────────────────────────────────────
+//  HANDLERS
+// ──────────────────────────────────────────
+async function handleParse() {
+  const text = document.getElementById('nlp')?.value?.trim();
+  if (!text) { toast('Please type something first'); return; }
+
+  const btn = document.getElementById('nlp-btn');
+  const out = document.getElementById('nlp-result');
+  btn.disabled = true; btn.textContent = 'Reading…';
+  out.innerHTML = `<div class="pulse-row"><div class="dots"><span></span><span></span><span></span></div> Parsing your message…</div>`;
+
+  try {
+    const parsed = await parseNLP(text);
+
+    if (!parsed || !parsed.name || !parsed.month || !parsed.day) {
+      out.innerHTML = `<div class="parsed-err">
+        Couldn't parse that. Try: <em>"Remind me on Dec 2nd to wish Pooja, India timezone, 1 day before"</em>
+      </div>`;
+    } else {
+      const tzLbl   = tzLabel(parsed.timezone)   || parsed.timezone || '—';
+      const leadLbl = leadLabel(parsed.leadTime)  || 'On their birthday';
+      out.innerHTML = `<div class="parsed-ok">
+        <strong>Got it!</strong> ${parsed.name} · ${fmtDate(parsed.month, parsed.day)} · ${tzLbl} · ${leadLbl}
+      </div>`;
+
+      // Fill form
+      const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+      set('f-name',  parsed.name);
+      set('f-month', parsed.month);
+      set('f-day',   parsed.day);
+      set('f-tz',    parsed.timezone);
+      set('f-lead',  parsed.leadTime || 'on_day');
+    }
+  } catch (e) {
+    out.innerHTML = `<div class="parsed-err">Error: ${e.message}<br>Double-check your API key in Settings.</div>`;
+  }
+
+  btn.disabled = false; btn.textContent = 'Parse with AI →';
+}
+
+function handleSave() {
+  const name     = document.getElementById('f-name')?.value?.trim();
+  const month    = parseInt(document.getElementById('f-month')?.value);
+  const day      = parseInt(document.getElementById('f-day')?.value);
+  const timezone = document.getElementById('f-tz')?.value;
+  const leadTime = document.getElementById('f-lead')?.value;
+  const notifTime= document.getElementById('f-time')?.value || '08:00';
+
+  if (!name)     { toast('Please enter a name'); return; }
+  if (!timezone) { toast('Please select their timezone'); return; }
+
+  const editingId = state.editingId;
+  upsertBirthday({ name, month, day, timezone, leadTime, notifTime }, editingId);
+  toast(editingId ? `Updated ${name}'s birthday ✓` : `${name} added! 🎉`);
+  go('home', { editingId: null });
+}
+
+function handleDelete(id) {
+  const b = state.birthdays.find(x => x.id === id);
+  if (!b) return;
+  if (confirm(`Delete ${b.name}'s birthday?`)) {
+    removeBirthday(id);
+    toast('Deleted');
+    go('home');
+  }
+}
+
+function handleSaveSettings() {
+  const key = document.getElementById('s-key')?.value?.trim();
+  const tz  = document.getElementById('s-tz')?.value;
+  state.apiKey       = key;
+  state.userTimezone = tz;
+  saveData();
+  toast('Settings saved ✓');
+}
+
+// ──────────────────────────────────────────
+//  INIT
+// ──────────────────────────────────────────
+loadData();
+render();
+</script>
+</body>
+</html>

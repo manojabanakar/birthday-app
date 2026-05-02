@@ -435,54 +435,80 @@ function toggleLead(val) {
 //  CLAUDE API
 // ─────────────────────────────────────────
 async function parseNLP(text) {
-  if (!S.apiKey) { toast('Add your Hugging Face token in Settings first'); return null; }
+  // Smart client-side parser — no API needed, works instantly
+  const t = text.toLowerCase();
 
-  const prompt = `<s>[INST] You are a birthday reminder parser. Extract info from this sentence and return ONLY valid JSON, nothing else, no explanation.
+  // ── NAME: word after "wish", "for", "remind.*for", or first capitalized word
+  let name = null;
+  const wishMatch = text.match(/(?:wish|for|birthday of|birthday for)\s+([A-Z][a-z]+)/i);
+  if (wishMatch) name = wishMatch[1];
+  if (!name) { const cap = text.match(/\b([A-Z][a-z]{1,})\b/); if (cap) name = cap[1]; }
+  if (!name) name = null;
 
-JSON format: {"name":"string","month":<1-12>,"day":<1-31>,"timezone":"IANA timezone string or null","leadTimes":["on_day"]}
+  // ── MONTH
+  const monthNames = ['january','february','march','april','may','june',
+                      'july','august','september','october','november','december'];
+  const monthShort = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  let month = null;
+  for (let i = 0; i < 12; i++) {
+    if (t.includes(monthNames[i]) || t.includes(monthShort[i])) { month = i + 1; break; }
+  }
+  // numeric month like 12/2 or 12-2
+  if (!month) { const m = t.match(/\b(1[0-2]|0?[1-9])[\/\-](3[01]|[12]\d|0?[1-9])\b/); if (m) { month = parseInt(m[1]); } }
 
-Timezone mappings:
-india/IST/Indian timings → Asia/Kolkata
-New York/ET/Eastern → America/New_York
-LA/PT/California → America/Los_Angeles
-London/UK/GMT → Europe/London
-Dubai/UAE → Asia/Dubai
-Pakistan → Asia/Karachi
-Singapore → Asia/Singapore
-Tokyo/Japan → Asia/Tokyo
-Paris/Germany/CET/Europe → Europe/Paris
-Sydney/Australia → Australia/Sydney
+  // ── DAY: number right after month name, or "2nd", "3rd", "21st" etc
+  let day = null;
+  const ordinal = text.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/i);
+  if (ordinal) day = parseInt(ordinal[1]);
+  if (!day) {
+    // number after month word
+    const afterMonth = text.match(/(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})/i);
+    if (afterMonth) day = parseInt(afterMonth[1]);
+  }
+  if (!day) {
+    // number before month word
+    const beforeMonth = text.match(/(\d{1,2})\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i);
+    if (beforeMonth) day = parseInt(beforeMonth[1]);
+  }
+  if (!day) { const m = t.match(/\b(1[0-2]|0?[1-9])[\/\-](3[01]|[12]\d|0?[1-9])\b/); if (m) day = parseInt(m[2]); }
 
-LeadTimes options (pick all mentioned, default ["on_day"]):
-"on the day/same day" → on_day
-"1 day before/day before" → 1_day
-"2 days before" → 2_days
-"week before/1 week before" → 1_week
-
-Sentence: "${text}"
-
-Return only JSON: [/INST]`;
-
-  const res = await fetch('https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${S.apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inputs: prompt, parameters: { max_new_tokens: 200, temperature: 0.1, return_full_text: false } }),
-  });
-
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    if (res.status === 503) throw new Error('Model is loading, please wait 20 seconds and try again');
-    throw new Error(e.error || `HTTP ${res.status}`);
+  // ── TIMEZONE
+  const tzMap = [
+    { keys: ['india','indian','ist','kolkata','mumbai','delhi','bengaluru','bangalore'], tz: 'Asia/Kolkata' },
+    { keys: ['new york','eastern','est','edt',' et ','et,','et.'], tz: 'America/New_York' },
+    { keys: ['chicago','central','cst','cdt'], tz: 'America/Chicago' },
+    { keys: ['denver','mountain','mst','mdt'], tz: 'America/Denver' },
+    { keys: ['los angeles','california','pacific','pst','pdt',' pt ','la,','west coast'], tz: 'America/Los_Angeles' },
+    { keys: ['london','uk','england','gmt','bst'], tz: 'Europe/London' },
+    { keys: ['paris','berlin','germany','france','cet','cest','europe'], tz: 'Europe/Paris' },
+    { keys: ['dubai','uae','gulf','gst'], tz: 'Asia/Dubai' },
+    { keys: ['pakistan','karachi','pkt'], tz: 'Asia/Karachi' },
+    { keys: ['nepal','kathmandu','npt'], tz: 'Asia/Kathmandu' },
+    { keys: ['bangladesh','dhaka'], tz: 'Asia/Dhaka' },
+    { keys: ['sri lanka','colombo'], tz: 'Asia/Colombo' },
+    { keys: ['singapore','malaysia','kuala lumpur',' sgt'], tz: 'Asia/Singapore' },
+    { keys: ['tokyo','japan','jst'], tz: 'Asia/Tokyo' },
+    { keys: ['china','beijing','shanghai'], tz: 'Asia/Shanghai' },
+    { keys: ['sydney','australia','aest','aedt'], tz: 'Australia/Sydney' },
+    { keys: ['auckland','new zealand','nzst'], tz: 'Pacific/Auckland' },
+  ];
+  let timezone = null;
+  for (const { keys, tz } of tzMap) {
+    if (keys.some(k => t.includes(k))) { timezone = tz; break; }
   }
 
-  const data = await res.json();
-  const raw  = Array.isArray(data) ? data[0]?.generated_text : data?.generated_text;
-  if (!raw) throw new Error('Empty response from model');
+  // ── LEAD TIMES
+  const leadTimes = [];
+  if (/\b(on the day|same day|on (?:their|her|his) birthday|day itself)\b/.test(t)) leadTimes.push('on_day');
+  if (/\b(1|one)\s+day\s+before\b/.test(t) || /\bday before\b/.test(t)) leadTimes.push('1_day');
+  if (/\b(2|two)\s+days?\s+before\b/.test(t)) leadTimes.push('2_days');
+  if (/\b(1|one)?\s*week\s+before\b/.test(t)) leadTimes.push('1_week');
+  if (leadTimes.length === 0) leadTimes.push('on_day');
 
-  // Extract JSON from the response
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Could not find JSON in response');
-  return JSON.parse(match[0]);
+  // Validate day range
+  if (day && (day < 1 || day > 31)) day = null;
+
+  return { name, month, day, timezone, leadTimes };
 }
 
 // ─────────────────────────────────────────
@@ -642,13 +668,8 @@ function renderSettings() {
       ${tzSearchHtml({id:'s-tz', query:S.sTzQ, selected:S.sTz, onInput:'sTzInput', onSelect:'sTzPick'})}
     </div>
 
-    <div class="section-header">AI — Natural Language</div>
-
-    <div class="form-group">
-      <label class="form-label">Hugging Face Token</label>
-      <input class="form-input" id="s-key" type="password" placeholder="hf_..." value="${S.apiKey}" style="font-family:monospace;font-size:13px">
-      <div class="settings-note">Needed for the "Say it naturally" feature — it's free!<br>Get your token at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> → New Token → Read type.</div>
-    </div>
+    <div class="section-header">About</div>
+    <div class="settings-note" style="margin-top:4px">Natural language parsing works built-in — no API key needed. Just type naturally and it understands you instantly.</div>
 
     <button class="submit-btn" onclick="handleSaveSettings()">Save Settings</button>
 

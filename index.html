@@ -605,6 +605,16 @@ function renderHome(){
         ${rest.length?`${soon.length?'<div class="list-section-label" style="margin-top:24px">All birthdays</div>':''}${rest.map(card).join('')}`:''}
       </div>`;
 
+  const notifBanner = ('Notification' in window && Notification.permission === 'default')
+    ? `<div class="import-banner fade-in" onclick="enableNotifications()" style="background:linear-gradient(135deg,#FFF3E0,#FFF8E1);border-color:rgba(255,152,0,0.3);margin-top:10px">
+        <span class="import-icon">🔔</span>
+        <div class="import-text">
+          <div class="import-title" style="color:#E65100">Enable Notifications</div>
+          <div class="import-sub" style="color:#F57C00">Tap to get birthday reminders</div>
+        </div>
+        <span class="import-arrow" style="color:#F57C00">→</span>
+      </div>` : '';
+
   return `
     <div class="header fade-in">
       <div><div class="header-eyebrow">upcoming</div><div class="header-title">Birthdays</div></div>
@@ -618,6 +628,7 @@ function renderHome(){
       </div>
       <span class="import-arrow">→</span>
     </div>
+    ${notifBanner}
     ${listHtml}`;
 }
 
@@ -869,6 +880,17 @@ async function scheduleNotifications() {
 }
 
 // Ask for notification permission after sign in
+async function enableNotifications() {
+  const granted = await requestNotificationPermission();
+  if (granted) {
+    toast('🔔 Notifications enabled!');
+    scheduleNotifications();
+    render(); // re-render to hide the banner
+  } else {
+    toast('Notifications blocked — enable in iPhone Settings');
+  }
+}
+
 async function setupNotifications() {
   await registerSW();
   const granted = await requestNotificationPermission();

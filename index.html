@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Birthdays</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Birthdays">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="theme-color" content="#C4622D">
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -832,6 +838,56 @@ function handleSaveSettings(){
 // ── INIT ──────────────────────────────────
 try{const s=JSON.parse(localStorage.getItem('bday_settings')||'{}');if(s.userTimezone) S.userTimezone=s.userTimezone;}catch(e){}
 
+// ── SERVICE WORKER + NOTIFICATIONS ───────────
+// Simple: Register the background helper and ask permission to send notifications
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    console.log('Service worker registered ✓');
+    window._swReg = reg;
+  } catch(e) { console.log('SW registration failed:', e); }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+// Schedule notifications by telling the service worker which birthdays to check
+async function scheduleNotifications() {
+  if (!navigator.serviceWorker?.controller) return;
+  if (Notification.permission !== 'granted') return;
+  navigator.serviceWorker.controller.postMessage({
+    type:         'SCHEDULE_NOTIFICATIONS',
+    birthdays:    S.birthdays,
+    userTimezone: S.userTimezone,
+  });
+}
+
+// Ask for notification permission after sign in
+async function setupNotifications() {
+  await registerSW();
+  const granted = await requestNotificationPermission();
+  if (granted) {
+    toast('🔔 Notifications enabled!');
+    scheduleNotifications();
+  }
+}
+
+// Run daily check — every time app opens, tell SW to check today's birthdays
+async function runDailyCheck() {
+  // Wait for SW to be ready
+  if ('serviceWorker' in navigator) {
+    await navigator.serviceWorker.ready;
+    scheduleNotifications();
+  }
+}
+
+registerSW();
 render(); // show loading spinner
 
 auth.onAuthStateChanged(async user=>{
@@ -839,6 +895,9 @@ auth.onAuthStateChanged(async user=>{
   if(user){
     await loadBirthdays();
     go('home');
+    // Setup notifications after sign in
+    setupNotifications();
+    runDailyCheck();
   } else {
     go('login');
   }

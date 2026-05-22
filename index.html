@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Birthdays</title>
   <link rel="manifest" href="/manifest.json">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Birthdays">
@@ -849,77 +850,70 @@ function handleSaveSettings(){
 // ── INIT ──────────────────────────────────
 try{const s=JSON.parse(localStorage.getItem('bday_settings')||'{}');if(s.userTimezone) S.userTimezone=s.userTimezone;}catch(e){}
 
-// ── SERVICE WORKER + NOTIFICATIONS ───────────
-// Simple: Register the background helper and ask permission to send notifications
-async function registerSW() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    const reg = await navigator.serviceWorker.register('/sw.js');
-    console.log('Service worker registered ✓');
-    window._swReg = reg;
-  } catch(e) { console.log('SW registration failed:', e); }
-}
+// ── ONESIGNAL NOTIFICATIONS ──────────────────
+const OS_APP_ID = '7f4d2625-c0f9-4228-b8ab-2019d40799e9';
 
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied') return false;
-  const result = await Notification.requestPermission();
-  return result === 'granted';
-}
-
-// Schedule notifications by telling the service worker which birthdays to check
-async function scheduleNotifications() {
-  if (!navigator.serviceWorker?.controller) return;
-  if (Notification.permission !== 'granted') return;
-  navigator.serviceWorker.controller.postMessage({
-    type:         'SCHEDULE_NOTIFICATIONS',
-    birthdays:    S.birthdays,
-    userTimezone: S.userTimezone,
+function initOneSignal() {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId:                        OS_APP_ID,
+      serviceWorkerPath:            '/sw.js',
+      serviceWorkerParam:           { scope: '/' },
+      allowLocalhostAsSecureOrigin: true,
+      notifyButton:                 { enable: false },
+      welcomeNotification:          { disable: true },
+    });
+    console.log('OneSignal ready ✓');
   });
 }
 
-// Ask for notification permission after sign in
 async function enableNotifications() {
-  const granted = await requestNotificationPermission();
-  if (granted) {
-    toast('🔔 Notifications enabled!');
-    scheduleNotifications();
-    render(); // re-render to hide the banner
-  } else {
-    toast('Notifications blocked — enable in iPhone Settings');
-  }
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    try {
+      await OneSignal.Notifications.requestPermission();
+      if (OneSignal.Notifications.permission) {
+        toast('🔔 Notifications enabled!');
+        await tagUserBirthdays();
+        render();
+      } else {
+        toast('Notifications blocked — check iPhone Settings → Birthdays');
+      }
+    } catch(e) { toast('Error: ' + e.message); }
+  });
 }
 
-async function setupNotifications() {
-  await registerSW();
-  const granted = await requestNotificationPermission();
-  if (granted) {
-    toast('🔔 Notifications enabled!');
-    scheduleNotifications();
-  }
+async function tagUserBirthdays() {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    const tags = { bday_count: S.birthdays.length, user_timezone: S.userTimezone };
+    S.birthdays.forEach((b, i) => {
+      tags[`bday_${i}_name`]  = b.name;
+      tags[`bday_${i}_month`] = String(b.month);
+      tags[`bday_${i}_day`]   = String(b.day);
+      tags[`bday_${i}_tz`]    = b.timezone;
+      tags[`bday_${i}_leads`] = (b.leadTimes||['on_day']).join(',');
+      tags[`bday_${i}_time`]  = b.notifTime||'08:00';
+    });
+    await OneSignal.User.addTags(tags);
+    console.log('Birthday tags saved ✓');
+  });
 }
 
-// Run daily check — every time app opens, tell SW to check today's birthdays
-async function runDailyCheck() {
-  // Wait for SW to be ready
-  if ('serviceWorker' in navigator) {
-    await navigator.serviceWorker.ready;
-    scheduleNotifications();
-  }
+function requestNotificationPermission() {
+  return ('Notification' in window) && Notification.permission === 'granted';
 }
 
-registerSW();
-render(); // show loading spinner
+initOneSignal();
+render();
 
 auth.onAuthStateChanged(async user=>{
   S.user=user;
   if(user){
     await loadBirthdays();
     go('home');
-    // Setup notifications after sign in
-    setupNotifications();
-    runDailyCheck();
+    setTimeout(()=>tagUserBirthdays(), 2000);
   } else {
     go('login');
   }

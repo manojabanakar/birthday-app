@@ -606,7 +606,7 @@ function renderHome(){
         ${rest.length?`${soon.length?'<div class="list-section-label" style="margin-top:24px">All birthdays</div>':''}${rest.map(card).join('')}`:''}
       </div>`;
 
-  const notifBanner = ('Notification' in window && Notification.permission === 'default')
+  const notifBanner = ('Notification' in window && Notification.permission !== 'granted')
     ? `<div class="import-banner fade-in" onclick="enableNotifications()" style="background:linear-gradient(135deg,#FFF3E0,#FFF8E1);border-color:rgba(255,152,0,0.3);margin-top:10px">
         <span class="import-icon">🔔</span>
         <div class="import-text">
@@ -869,19 +869,31 @@ function initOneSignal() {
 }
 
 async function enableNotifications() {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(async function(OneSignal) {
-    try {
-      await OneSignal.Notifications.requestPermission();
-      if (OneSignal.Notifications.permission) {
-        toast('🔔 Notifications enabled!');
-        await tagUserBirthdays();
-        render();
-      } else {
-        toast('Notifications blocked — check iPhone Settings → Birthdays');
+  try {
+    // Try native browser notification permission first
+    if (!('Notification' in window)) {
+      toast('Notifications not supported on this browser');
+      return;
+    }
+
+    // Request permission directly
+    const result = await Notification.requestPermission();
+    if (result === 'granted') {
+      toast('🔔 Notifications enabled!');
+      render();
+      // Also register with OneSignal if available
+      if (window.OneSignal) {
+        try { await window.OneSignal.Notifications.requestPermission(); } catch(e) {}
+        tagUserBirthdays();
       }
-    } catch(e) { toast('Error: ' + e.message); }
-  });
+    } else if (result === 'denied') {
+      toast('Blocked — go to iPhone Settings → Safari → Notifications → Allow');
+    } else {
+      toast('Please tap Allow when the popup appears');
+    }
+  } catch(e) {
+    toast('Error: ' + e.message);
+  }
 }
 
 async function tagUserBirthdays() {
